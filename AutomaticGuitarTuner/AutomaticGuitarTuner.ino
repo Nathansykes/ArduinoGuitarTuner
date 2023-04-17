@@ -76,7 +76,7 @@ byte Divider = 1;
 
 int StringNotes[] = {0, NOTE_E4, NOTE_B3, NOTE_G3, NOTE_D3, NOTE_A2, NOTE_E2};
 int TargetNote = NOTE_E2;
-int StringNumber = 0;
+int StringNumber = 6;
 
 //this is the acceptable variance from the target note in hz
 double Variance = 2.5;
@@ -91,16 +91,18 @@ void setup()
 {
   Serial.begin(9600);
   SamplingPeriod = round(1000000 * (1.0 / SAMPLING_FREQUENCY));
-  servo.attach(9); 
+  //servo.attach(9); 
 }
 
 void loop()
 {
   SetStringFromSerial();
-  if(StringNumber == 0)
-    return;
-  SampleAudio();
-  TuneString();
+  if(StringNumber != 0)
+  {
+    SampleAudio2();
+    //TuneString();
+    //while(true){}
+  }
 }
 
 void TuneString()
@@ -129,8 +131,10 @@ void SetStringFromSerial()
   delay(10);
   if (Serial.available() > 0)
   {
-    int str = (int)Serial.read();
+    String c = Serial.readString();
     Serial.print("String: ");
+    Serial.println(c);
+    int str = c.toInt();
     Serial.println(str);
     if (str > 0 && str <= 6)
     {
@@ -155,84 +159,105 @@ bool NoteWithin20Percent(double frequency)
 
 double CleanFrequency(double frequency)
 {
+  Serial.print("Attempting to clean frequency: ");
+  Serial.println(frequency);
+  Serial.print("Target note: ");
+  Serial.println(TargetNote);
   //were need to check anything outside 20% of the note for resonant frequencies and subdivide it
   if (!NoteWithin20Percent(frequency))
   {
     //check if it is a resonant frequency
-    if (!NoteWithin20Percent(frequency / 2))
+    if (NoteWithin20Percent(frequency / 2))
       return frequency / 2;
-    else if (!NoteWithin20Percent(frequency / 3))
+    else if (NoteWithin20Percent(frequency / 3))
       return frequency / 3;
   }
   return frequency;
 }
 
-double getMean(double arr[], int size);
-double getStdDev(double arr[], int size);
+double getAverage(double *arr, int size);
+double getStdDev(double *arr, int size);
 
 const int passes = 10;
 void SampleAudio()
 {
+  Serial.println("Beginning audio sampling");
+
   //read the audio 10 times and get the average whilst also excluding outliers
   double cleanFrequencies[passes];
-  for(int i = 0; i < sizeof(cleanFrequencies); i++)
+  for(int i = 0; i < passes; i++)
   {
-    delay(2);
-    for (int i = 0; i < SAMPLES; i++)
+    Serial.println("==================================");
+    Serial.print("Taking Sample: ");
+    Serial.println(i + 1);
+    //delay(1);
+    for (int j = 0; j < SAMPLES; j++)
     {
       Microseconds = micros();
-      vReal[i] = analogRead(A0);
-      vImag[i] = 0;
+      vReal[j] = analogRead(A0);
+      vImag[j] = 0;
       while (micros() < Microseconds + SamplingPeriod) { }
     }
+
 
     FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
     FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
     FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
 
+
     double readFrequency = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
     cleanFrequencies[i] = CleanFrequency(readFrequency);
+    Serial.print("Peak Frequency in this pass: ");
+    Serial.println(cleanFrequencies[i]);
   }
-  
-  double mean = getMean(cleanFrequencies, sizeof(cleanFrequencies));
-  double stdDev = getStdDev(cleanFrequencies, sizeof(cleanFrequencies));
+  Serial.println("==================================");
+
+  double average = getAverage(cleanFrequencies, passes);
+  Serial.print("Average: ");
+  Serial.println(average);
+  double stdDev = getStdDev(cleanFrequencies, passes) / 2;
+  Serial.print("Standard Deviation: ");
+  Serial.println(stdDev);
+
   double threshold = 3;
   int validFrequenciesCount = 0;
-  for(int i = 0; i < sizeof(cleanFrequencies); i++)
+  for(int i = 0; i < passes; i++)
   {
-    double z = (cleanFrequencies[i] - mean) / stdDev;
-    if(abs(z) > threshold)
+    double z = (cleanFrequencies[i] - average) / stdDev;
+    if(abs(z) < threshold)
       validFrequenciesCount++;
   }
+
+  Serial.print("Count of Valid Frequencies: ");
+  Serial.println(validFrequenciesCount);
   
   double finalFrequencies[validFrequenciesCount];
   int index = 0;
-  for(int i = 0; i < sizeof(cleanFrequencies); i++)
+  for(int i = 0; i < passes; i++)
   {
-    double z = (cleanFrequencies[i] - mean) / stdDev;
-    if(abs(z) > threshold)
+    double z = (cleanFrequencies[i] - average) / stdDev;
+    if(abs(z) < threshold)
       finalFrequencies[index++] = cleanFrequencies[i];
   }
 
   //now get the average of the final frequencies
-  double averageFrequency = getMean(finalFrequencies, sizeof(finalFrequencies));
-
+  double averageFrequency = getAverage(finalFrequencies, validFrequenciesCount);
   PeakFrequency = CleanFrequency(averageFrequency);
 
-  //get the amplitde
-  double amplitude = vReal[0]; //this might work
-  Serial.print("amplitude = ");
-  Serial.println(amplitude);
+  // //get the amplitde
+  // double amplitude = vReal[0]; //this might work
+  // Serial.print("amplitude = ");
+  // Serial.println(amplitude);
 
 
+  Serial.print("Average Frequency: ");
   Serial.print(PeakFrequency);
   Serial.println("hz");
 }
 
-
 //math functions
 
-double getMean(double arr[], int size) {
+double getAverage(double *arr, int size) {
     double sum = 0;
     for (int i = 0; i < size; i++) {
         sum += arr[i];
@@ -240,11 +265,46 @@ double getMean(double arr[], int size) {
     return sum / size;
 }
 
-double getStdDev(double arr[], int size) {
-    double mean = getMean(arr, size);
+double getStdDev(double *arr, int size) {
+    double average = getAverage(arr, size);
+    
     double sum = 0;
     for (int i = 0; i < size; i++) {
-        sum += pow(arr[i] - mean, 2);
+        sum += pow(arr[i] - average, 2);
     }
-    return sqrt(sum / (size - 1));
+
+    Serial.print("sum: ");
+    Serial.println(sum);
+    Serial.print("sum / size: ");
+    Serial.println(sum / size);
+
+    double root = sqrt(sum / size);
+    Serial.print("root: ");
+    Serial.println(root);
+
+    return sqrt(sum / size);
 }
+
+
+void SampleAudio2()
+{
+  delay(10);
+  for (int i = 0; i < SAMPLES; i++)
+  {
+    Microseconds = micros();
+    vReal[i] = analogRead(A0);
+    vImag[i] = 0;
+    while (micros() < Microseconds + SamplingPeriod) { }
+  }
+
+  FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
+  FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
+  FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
+
+  PeakFrequency = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
+
+  Serial.print(PeakFrequency);
+  Serial.println("hz");
+}
+
+
