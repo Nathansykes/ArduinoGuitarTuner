@@ -74,12 +74,12 @@ unsigned long Microseconds;
 double PeakFrequency;
 byte Divider = 1;
 
-int StringNotes[] = {0, NOTE_E4, NOTE_B3, NOTE_G3, NOTE_D3, NOTE_A2, NOTE_E2};
+int StringNotes[] = {0, NOTE_E4, NOTE_B3, NOTE_G3, NOTE_D3, NOT3E_A2, NOTE_E2};
 int TargetNote = NOTE_E2;
 int StringNumber = 6;
 
 //this is the acceptable variance from the target note in hz
-double Variance = 2.5;
+double Variance = 1.2;
 
 int Speed = 0;
 
@@ -99,8 +99,8 @@ void loop()
   SetStringFromSerial();
   if(StringNumber != 0)
   {
-    SampleAudio2();
-    //TuneString();
+    SampleAudio();
+    TuneString();
     //while(true){}
   }
 }
@@ -123,12 +123,12 @@ void TuneString()
     Speed = 90;
   }
   servo.write(Speed);
-  delay(10);
+  delay(5);
 }
 
 void SetStringFromSerial()
 {
-  delay(10);
+  delay(1);
   if (Serial.available() > 0)
   {
     String c = Serial.readString();
@@ -143,7 +143,7 @@ void SetStringFromSerial()
     }
     else
     {
-      Serial.println("Invalid string number");
+      //Serial.println("Invalid string number");
       StringNumber = 0;
     }
   }
@@ -159,10 +159,10 @@ bool NoteWithin20Percent(double frequency)
 
 double CleanFrequency(double frequency)
 {
-  Serial.print("Attempting to clean frequency: ");
-  Serial.println(frequency);
-  Serial.print("Target note: ");
-  Serial.println(TargetNote);
+  // Serial.print("Attempting to clean frequency: ");
+  // Serial.println(frequency);
+  // Serial.print("Target note: ");
+  // Serial.println(TargetNote);
   //were need to check anything outside 20% of the note for resonant frequencies and subdivide it
   if (!NoteWithin20Percent(frequency))
   {
@@ -181,15 +181,15 @@ double getStdDev(double *arr, int size);
 const int passes = 10;
 void SampleAudio()
 {
-  Serial.println("Beginning audio sampling");
+  //Serial.println("Beginning audio sampling");
 
   //read the audio 10 times and get the average whilst also excluding outliers
   double cleanFrequencies[passes];
   for(int i = 0; i < passes; i++)
   {
-    Serial.println("==================================");
-    Serial.print("Taking Sample: ");
-    Serial.println(i + 1);
+    //Serial.println("==================================");
+    //Serial.print("Taking Sample: ");
+    //Serial.println(i + 1);
     //delay(1);
     for (int j = 0; j < SAMPLES; j++)
     {
@@ -207,17 +207,17 @@ void SampleAudio()
 
     double readFrequency = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
     cleanFrequencies[i] = CleanFrequency(readFrequency);
-    Serial.print("Peak Frequency in this pass: ");
-    Serial.println(cleanFrequencies[i]);
+    //Serial.print("Peak Frequency in this pass: ");
+    //Serial.println(cleanFrequencies[i]);
   }
-  Serial.println("==================================");
+  //Serial.println("==================================");
 
   double average = getAverage(cleanFrequencies, passes);
-  Serial.print("Average: ");
-  Serial.println(average);
+  //Serial.print("Average: ");
+  //Serial.println(average);
   double stdDev = getStdDev(cleanFrequencies, passes) / 2;
-  Serial.print("Standard Deviation: ");
-  Serial.println(stdDev);
+  //Serial.print("Standard Deviation: ");
+  //Serial.println(stdDev);
 
   double threshold = 3;
   int validFrequenciesCount = 0;
@@ -228,8 +228,8 @@ void SampleAudio()
       validFrequenciesCount++;
   }
 
-  Serial.print("Count of Valid Frequencies: ");
-  Serial.println(validFrequenciesCount);
+  //Serial.print("Count of Valid Frequencies: ");
+  //Serial.println(validFrequenciesCount);
   
   double finalFrequencies[validFrequenciesCount];
   int index = 0;
@@ -250,9 +250,9 @@ void SampleAudio()
   // Serial.println(amplitude);
 
 
-  Serial.print("Average Frequency: ");
+  //Serial.print("Average Frequency: ");
   Serial.print(PeakFrequency);
-  Serial.println("hz");
+  Serial.print("hz, ");
 }
 
 //math functions
@@ -273,14 +273,7 @@ double getStdDev(double *arr, int size) {
         sum += pow(arr[i] - average, 2);
     }
 
-    Serial.print("sum: ");
-    Serial.println(sum);
-    Serial.print("sum / size: ");
-    Serial.println(sum / size);
-
     double root = sqrt(sum / size);
-    Serial.print("root: ");
-    Serial.println(root);
 
     return sqrt(sum / size);
 }
@@ -288,7 +281,7 @@ double getStdDev(double *arr, int size) {
 
 void SampleAudio2()
 {
-  delay(10);
+  delay(11);
   for (int i = 0; i < SAMPLES; i++)
   {
     Microseconds = micros();
