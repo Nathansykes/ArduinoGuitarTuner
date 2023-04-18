@@ -75,14 +75,13 @@ double PeakFrequency;
 byte Divider = 1;
 
 int StringNotes[] = { 0, NOTE_E4, NOTE_B3, NOTE_G3, NOTE_D3, NOTE_A2, NOTE_E2 };
-int TargetNote = NOTE_E2;
+int TargetNote = NOTE_F2;
 int StringNumber = 6;
 
 //this is the acceptable variance from the target note in hz
-double Variance = 1.54;
+double Variance = 3;
 
 int Speed = 0;
-
 //continuous servo
 Servo servo;
 #define ServoZero 90
@@ -95,27 +94,29 @@ void setup() {
 
 void loop() {
   SetStringFromSerial();
-  if (StringNumber != 0) {
+  //if (StringNumber != 0) {
     SampleAudio();
     TuneString();
-    //while(true){}
-  }
+  //}
+  Serial.println("");
 }
 
 void TuneString() {
+  if(PeakFrequency == 0)
+    return;
   if (PeakFrequency > TargetNote + Variance) {
     Serial.print("Too high");
-    Speed = 95;
+    Speed = 100;
   } else if (PeakFrequency < TargetNote - Variance) {
     Serial.print("Too low");
-    Speed = 85;
+    Speed = 60;
   } else {
     Serial.print("In tune");
     Speed = 90;
   }
 
   Serial.print(", Target: ");
-  Serial.println(TargetNote);
+  Serial.print(TargetNote);
 
   servo.write(Speed);
   delay(5);
@@ -129,18 +130,19 @@ void SetStringFromSerial() {
     Serial.println(c);
     int str = c.toInt();
     Serial.println(str);
-    if (str > 0 && str <= 6) {
+    if (str > 0 && str <= 6) {//set the selected string
       StringNumber = str;
       TargetNote = StringNotes[str];
-    } else {
+    } else { // set the frequency directly
       //Serial.println("Invalid string number");
-      StringNumber = 0;
+      TargetNote = str;
+      //StringNumber = 0;
     }
   }
 }
 
-bool NoteWithin20Percent(double frequency) {
-  if (frequency > TargetNote * 1.2 || frequency < TargetNote * 0.2)
+bool NoteWithinRange(double frequency, double rangeDecimal = 0.08) {
+  if (frequency > TargetNote * (1 + rangeDecimal)|| frequency < TargetNote * rangeDecimal)
     return false;
   else
     return true;
@@ -152,11 +154,11 @@ double CleanFrequency(double frequency) {
   // Serial.print("Target note: ");
   // Serial.println(TargetNote);
   //were need to check anything outside 20% of the note for resonant frequencies and subdivide it
-  if (!NoteWithin20Percent(frequency)) {
+  if (!NoteWithinRange(frequency)) {
     //check if it is a resonant frequency
-    if (NoteWithin20Percent(frequency / 2))
+    if (NoteWithinRange(frequency / 2))
       return frequency / 2;
-    else if (NoteWithin20Percent(frequency / 3))
+    else if (NoteWithinRange(frequency / 3))
       return frequency / 3;
   }
   return frequency;
@@ -190,6 +192,8 @@ void SampleAudio() {
 
 
     double readFrequency = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
+
+
     cleanFrequencies[i] = CleanFrequency(readFrequency);
     //Serial.print("Peak Frequency in this pass: ");
     //Serial.println(cleanFrequencies[i]);
