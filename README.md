@@ -11,7 +11,7 @@ Upload it to the Arduino Uno
 #### Running
 The program will run continuously
 
-Use serial to set the selected string
+Use serial to set the selected string (1-6) or set the desired frequency by entering a number above 6
 
 Place the motor on the corresponding tuning peg
 
@@ -26,6 +26,10 @@ Play the string and the motor will turn in the direction to bring the frequency 
 ## Circuit Diagram
 ![Circuit Diagram](https://raw.githubusercontent.com/Nathansykes/ArduinoGuitarTuner/master/CircuitDiagram.png)
 
+## Known Issues
+- Frequency can give inaccurate readings if not enough amplitude
+- Motor does not provide enough torque to tune to E Standard
+- Noise from the motor can intefere with readings from the microphone
 
 ## Third Party Libraries
 This makes uses of the following libraries: 
